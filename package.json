@@ -10,9 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@nextui-org/react": "^2.1.12",
+    "@nextui-org/react": "2.6.11",
     "@react-stately/data": "^3.10.2",
-    "framer-motion": "^10.16.4",
+    "framer-motion": "^11.18.2",
     "lucide-react": "^0.279.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -27,7 +27,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.3",
     "postcss": "^8.4.29",
-    "tailwindcss": "^3.3.3",
+    "tailwindcss": "^3.4.17",
     "vite": "^4.4.5"
   }
 }

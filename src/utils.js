@@ -1,6 +1,7 @@
-import { campLocation } from "./data";
-
-const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000";
+const BACKEND_BASE_URL =
+  import.meta.env.VITE_BACKEND_BASE_URL || `${API_BASE_URL}/client`;
 
 export const randomElementFromArray = (arr) => {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -105,21 +106,35 @@ export const addLogsToIPFSandBlockchain = async () => {
       referrerPolicy: "no-referrer",
     });
     const res = await response.json();
-    if (res.message == "Success") alert("Logs Added");
-    else throw "Error";
+    if (res.message != "Success") throw "Error";
+    if (!res.block) alert("No new logs to anchor - add some logs first.");
+    else
+      alert(
+        `Anchored ${res.block.log_count} logs in block #${res.block.block_index}\n` +
+          `Merkle root: ${res.block.merkle_root}\nBlock hash: ${res.block.hash}`
+      );
   } catch (e) {
-    alert("Something Went Wrong Here");
+    alert("Could not reach the backend - is it running on " + API_BASE_URL + "?");
     console.log(e);
   }
 };
 
 export function generateRandomLog(campLocation) {
+  const TransactionType = randomElementFromArray(["Deposit", "Withdrawal", "Transfer"]);
+  const OldBalanceOrig = randomInteger(500, 10000);
+  const TransactionAmount = randomInteger(1, Math.min(5000, OldBalanceOrig));
+  let NewBalanceOrig =
+    TransactionType === "Deposit"
+      ? OldBalanceOrig + TransactionAmount
+      : OldBalanceOrig - TransactionAmount;
+  // ~25% of logs have a balance that doesn't reconcile (a typical fraud signal)
+  if (Math.random() < 0.25) NewBalanceOrig = randomInteger(0, 10000);
   return {
-    TransactionAmount: Math.floor(Math.random() * 5000) + 1, // Random amount
-    OldBalanceOrig: Math.floor(Math.random() * 10000),
-    NewBalanceOrig: Math.floor(Math.random() * 10000),
+    TransactionAmount,
+    OldBalanceOrig,
+    NewBalanceOrig,
     CurrencyType: randomElementFromArray(["USD", "EUR", "INR"]),
-    TransactionType: randomElementFromArray(["Deposit", "Withdrawal", "Transfer"]),
+    TransactionType,
     TransactionStatus: randomElementFromArray(["Success", "Failed"]),
     PaymentMethod: randomElementFromArray(["Credit Card", "Debit Card", "PayPal"]),
     TransactionID: `TXN${Math.floor(Math.random() * 1000000)}`,
@@ -127,6 +142,7 @@ export function generateRandomLog(campLocation) {
     Geolocation: randomElementFromArray(["New York", "London", "Delhi"]),
     IPAddress: randomIP(),
     LoginTimestamp: new Date().toISOString(),
+    FailedLoginAttempts: randomElementFromArray([0, 0, 0, 1, 2, 5]),
     DeviceType: randomElementFromArray(["PC", "Mobile", "Tablet"]),
     MFAStatus: randomElementFromArray(["Enabled", "Disabled"]),
     APIAccess: randomElementFromArray(["Yes", "No"]),

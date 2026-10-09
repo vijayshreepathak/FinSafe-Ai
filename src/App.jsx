@@ -1,4 +1,3 @@
-import React from "react";
 import AddSingleLogEntry from "./components/AddSingleLogEntry";
 import CreateNlogs from "./components/CreateNlogs";
 import { Button, Divider } from "@nextui-org/react";

@@ -275,8 +275,12 @@
 //   );
 // }
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Button, Input, Select, SelectItem } from "@nextui-org/react";
+import { API_BASE_URL } from "../utils";
+
+const riskColor = (pct) =>
+  pct >= 60 ? "text-red-600" : pct >= 30 ? "text-amber-600" : "text-green-700";
 
 export default function Inputs() {
   const [formData, setFormData] = useState({
@@ -292,6 +296,7 @@ export default function Inputs() {
     Geolocation: "",
     IPAddress: "",
     LoginTimestamp: "",
+    FailedLoginAttempts: "",
     DeviceType: "",
     MFAStatus: "",
     APIAccess: "",
@@ -300,27 +305,39 @@ export default function Inputs() {
   });
 
   const [results, setResults] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Handle Input Changes
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  // Bind each field by name explicitly (NextUI Select's synthetic event doesn't always carry `name`)
+  const bind = (name) => ({
+    name,
+    onChange: (e) => {
+      const value = e.target.value;
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  });
 
   // Handle Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const response = await fetch("http://127.0.0.1:5000/api/predict", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData)
-    });
-
-    const data = await response.json();
-    setResults(data);
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/predict`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      setResults(data);
+    } catch (err) {
+      console.error(err);
+      setResults(null);
+      setError(`Prediction failed: ${err.message}. Is the backend running on ${API_BASE_URL}?`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -332,99 +349,101 @@ export default function Inputs() {
 
         {/* Transaction Inputs */}
         <h3 className="text-lg font-semibold">Transaction Details</h3>
-        <Input name="TransactionAmount" type="number" label="Transaction Amount" onChange={handleChange} />
-        <Input name="OldBalanceOrig" type="number" label="Old Balance (Origin)" onChange={handleChange} />
-        <Input name="NewBalanceOrig" type="number" label="New Balance (Origin)" onChange={handleChange} />
+        <Input {...bind("TransactionAmount")} type="number" min="0" label="Transaction Amount" isRequired />
+        <Input {...bind("OldBalanceOrig")} type="number" min="0" label="Old Balance (Origin)" isRequired />
+        <Input {...bind("NewBalanceOrig")} type="number" min="0" label="New Balance (Origin)" isRequired />
 
-        <Select name="CurrencyType" label="Currency Type" onChange={handleChange}>
+        <Select {...bind("CurrencyType")} label="Currency Type">
           <SelectItem key="USD">USD</SelectItem>
           <SelectItem key="EUR">EUR</SelectItem>
           <SelectItem key="INR">INR</SelectItem>
           <SelectItem key="GBP">GBP</SelectItem>
           <SelectItem key="JPY">JPY</SelectItem>
-
         </Select>
 
-        <Select name="TransactionType" label="Transaction Type" onChange={handleChange}>
+        <Select {...bind("TransactionType")} label="Transaction Type">
           <SelectItem key="Deposit">Deposit</SelectItem>
           <SelectItem key="Withdrawal">Withdrawal</SelectItem>
           <SelectItem key="Transfer">Transfer</SelectItem>
           <SelectItem key="Purchase">Purchase</SelectItem>
-
         </Select>
 
-        <Select name="TransactionStatus" label="Transaction Status" onChange={handleChange}>
+        <Select {...bind("TransactionStatus")} label="Transaction Status">
           <SelectItem key="Success">Success</SelectItem>
           <SelectItem key="Failed">Failed</SelectItem>
           <SelectItem key="Pending">Pending</SelectItem>
           <SelectItem key="Reversed">Reversed</SelectItem>
-
         </Select>
 
-        <Select name="PaymentMethod" label="Payment Method" onChange={handleChange}>
+        <Select {...bind("PaymentMethod")} label="Payment Method">
           <SelectItem key="Credit Card">Credit Card</SelectItem>
           <SelectItem key="Debit Card">Debit Card</SelectItem>
           <SelectItem key="Wallet">Wallet</SelectItem>
           <SelectItem key="UPI">UPI</SelectItem>
           <SelectItem key="Net Banking">Net Banking</SelectItem>
           <SelectItem key="Crypto">Crypto</SelectItem>
-
         </Select>
 
-        <Input name="TransactionID" label="Transaction ID" onChange={handleChange} />
-        <Input name="UserID" label="User ID" onChange={handleChange} />
+        <Input {...bind("TransactionID")} label="Transaction ID" />
+        <Input {...bind("UserID")} label="User ID" />
 
         {/* Authentication Inputs */}
         <h3 className="text-lg font-semibold">Authentication Details</h3>
-        <Input name="Geolocation" label="Geolocation" onChange={handleChange} />
-        <Input name="IPAddress" label="IP Address" onChange={handleChange} />
-        <Input name="LoginTimestamp" type="datetime-local" label="Login Timestamp" onChange={handleChange} />
+        <Input {...bind("Geolocation")} label="Geolocation" />
+        <Input {...bind("IPAddress")} label="IP Address" placeholder="e.g. 192.168.1.10" />
+        <Input {...bind("LoginTimestamp")} type="datetime-local" label="Login Timestamp" placeholder=" " />
+        <Input {...bind("FailedLoginAttempts")} type="number" min="0" label="Failed Login Attempts" />
 
-        <Select name="DeviceType" label="Device Type" onChange={handleChange}>
+        <Select {...bind("DeviceType")} label="Device Type">
           <SelectItem key="PC">PC</SelectItem>
           <SelectItem key="Mobile">Mobile</SelectItem>
           <SelectItem key="Tablet">Tablet</SelectItem>
           <SelectItem key="ATM">ATM</SelectItem>
           <SelectItem key="POS">POS</SelectItem>
-
         </Select>
 
-        <Select name="MFAStatus" label="MFA Status" onChange={handleChange}>
+        <Select {...bind("MFAStatus")} label="MFA Status">
           <SelectItem key="Enabled">Enabled</SelectItem>
           <SelectItem key="Disabled">Disabled</SelectItem>
         </Select>
 
-        <Select name="APIAccess" label="API Access (Y/N)" onChange={handleChange}>
+        <Select {...bind("APIAccess")} label="API Access (Y/N)">
           <SelectItem key="Yes">Yes</SelectItem>
           <SelectItem key="No">No</SelectItem>
         </Select>
 
-        <Select name="OS_BrowserInfo" label="OS Browser Info" onChange={handleChange}>
+        <Select {...bind("OS_BrowserInfo")} label="OS Browser Info">
           <SelectItem key="Windows">Windows-Chrome</SelectItem>
           <SelectItem key="MacOS">MacOS-Safari</SelectItem>
           <SelectItem key="Linux">Linux-Firefox</SelectItem>
           <SelectItem key="iOS">iOS-App</SelectItem>
           <SelectItem key="Android">Android-App</SelectItem>
-
-
         </Select>
 
-        <Select name="PrivilegedAccess" label="Privileged Access" onChange={handleChange}>
+        <Select {...bind("PrivilegedAccess")} label="Privileged Access">
           <SelectItem key="Admin">Admin</SelectItem>
           <SelectItem key="User">User</SelectItem>
           <SelectItem key="Guest">Guest</SelectItem>
         </Select>
 
         <div className="flex justify-center">
-          <Button type="submit" color="secondary">Submit</Button>
+          <Button type="submit" color="secondary" isLoading={loading}>Submit</Button>
         </div>
       </form>
 
+      {error && (
+        <div className="mt-6 p-4 bg-red-100 text-red-800 rounded-lg shadow">{error}</div>
+      )}
+
       {results && (
-        <div className="mt-6 p-4 bg-white rounded-lg shadow">
+        <div className="mt-6 p-4 bg-white text-black rounded-lg shadow space-y-1">
           <h3 className="text-lg font-bold">Predictions:</h3>
-          <p>🔹 <strong>Transaction Fraud Risk:</strong> {results.transaction_fraud_risk}%</p>
-          <p>🔹 <strong>Auth Fraud Risk:</strong> {results.auth_fraud_risk}%</p>
+          <p>🔹 <strong>Transaction Fraud Risk:</strong>{" "}
+            <span className={riskColor(results.transaction_fraud_risk)}>{results.transaction_fraud_risk}%</span></p>
+          <p>🔹 <strong>Auth Fraud Risk:</strong>{" "}
+            <span className={riskColor(results.auth_fraud_risk)}>{results.auth_fraud_risk}%</span></p>
+          <p>🔹 <strong>Overall:</strong>{" "}
+            <span className={`font-semibold ${riskColor(results.overall_risk)}`}>{results.risk_level} risk</span></p>
         </div>
       )}
     </div>

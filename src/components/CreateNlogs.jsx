@@ -1,36 +1,45 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Button, Input, Select, SelectItem } from "@nextui-org/react";
-import { addNumberofLogstoDatabase, generateRandomLog } from "../utils";
+import { API_BASE_URL, generateRandomLog } from "../utils";
 import * as data from "../data";
 
 export default function CreateNlogs() {
   const [number, setNumber] = useState(1);
   const [campLocation, setCampLocation] = useState("");
   const [logs, setLogs] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [sending, setSending] = useState(false);
+  const count = Math.min(Math.max(parseInt(number, 10) || 0, 0), 1000);
 
   // Function to generate N logs
   const generateLogs = () => {
     let newLogs = [];
-    for (let i = 0; i < number; i++) {
+    for (let i = 0; i < count; i++) {
       newLogs.push(generateRandomLog(campLocation));
     }
     setLogs(newLogs);
+    setSummary(null);
   };
 
   // Function to send logs to backend
   const sendLogsToBackend = async () => {
+    setSending(true);
     try {
-      const response = await fetch("http://127.0.0.1:5000/api/add-logs", {
+      const response = await fetch(`${API_BASE_URL}/api/add-logs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ logs })
       });
 
       const data = await response.json();
-      alert(`✅ Successfully added ${logs.length} logs!`);
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      setSummary(data);
+      alert(`✅ Successfully added ${data.count} logs (${data.high_risk_count} high risk)!`);
     } catch (error) {
       console.error("Error adding logs:", error);
-      alert("❌ Error adding logs");
+      alert(`❌ Error adding logs: ${error.message}. Is the backend running on ${API_BASE_URL}?`);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -46,8 +55,10 @@ export default function CreateNlogs() {
         <div className="max-w-[400px] w-full">
           <Input
             type="number"
-            label="Enter number of logs"
-            value={number}
+            label="Enter number of logs (max 1000)"
+            min="1"
+            max="1000"
+            value={String(number)}
             onChange={(e) => setNumber(e.target.value)}
           />
         </div>
@@ -70,18 +81,38 @@ export default function CreateNlogs() {
       {/* Generate & Add Logs */}
       <div className="flex justify-center pt-8 gap-4">
         <Button color="secondary" onClick={generateLogs}>
-          Generate {number} Logs
+          Generate {count} Logs
         </Button>
-        <Button color="secondary" onClick={sendLogsToBackend} disabled={logs.length === 0}>
+        <Button color="secondary" onClick={sendLogsToBackend} isDisabled={logs.length === 0} isLoading={sending}>
           Add {logs.length} Logs to Database
         </Button>
       </div>
+
+      {/* Risk scores returned by the backend */}
+      {summary && (
+        <div className="p-4 bg-white text-black rounded-lg shadow">
+          <h3 className="text-lg font-bold mb-2">
+            Risk Scores ({summary.high_risk_count} of {summary.count} high risk)
+          </h3>
+          <div className="max-h-64 overflow-auto text-sm">
+            {summary.results.map((r, i) => (
+              <div key={i} className="flex justify-between border-b py-1">
+                <span>{r.TransactionID}</span>
+                <span>Txn {r.transaction_fraud_risk}% · Auth {r.auth_fraud_risk}%</span>
+                <span className={r.risk_level === "High" ? "text-red-600 font-semibold" : r.risk_level === "Medium" ? "text-amber-600" : "text-green-700"}>
+                  {r.risk_level}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Show Generated Logs */}
       {logs.length > 0 && (
         <div className="mt-6 p-4 bg-black rounded-lg shadow">
           <h3 className="text-lg font-bold">Generated Logs:</h3>
-          <pre className="text-sm bg-black-10 p-2 rounded">{JSON.stringify(logs, null, 2)}</pre>
+          <pre className="text-sm p-2 rounded max-h-96 overflow-auto">{JSON.stringify(logs, null, 2)}</pre>
         </div>
       )}
     </div>
